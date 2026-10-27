@@ -2,18 +2,511 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>A1: Hello World, GitHub and d3</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Night Shift</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <style>
+    :root {
+      --bg: #0b0d1e;
+      --panel: #151832;
+      --line: #2a2f5c;
+      --ink: #eef0ff;
+      --muted: #9aa3c7;
+      --accent: #ffd772;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 15% 0%, #1d2257 0%, var(--bg) 55%);
+      color: var(--ink);
+      font-family: "Space Grotesk", system-ui, sans-serif;
+    }
+    header { max-width: 1320px; margin: 0 auto; padding: 28px 32px 6px; }
+    h1 { margin: 0; font-size: clamp(28px, 4vw, 46px); letter-spacing: -0.02em; }
+    h1 span { color: var(--accent); }
+    header p { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+    main {
+      max-width: 1320px; margin: 0 auto; padding: 16px 32px 40px;
+      display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start;
+    }
+    #scene {
+      display: block; width: 100%; height: auto;
+      border-radius: 18px; box-shadow: 0 24px 70px rgba(0,0,0,.55);
+      cursor: crosshair; touch-action: manipulation;
+    }
+    aside {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+      padding: 18px; display: flex; flex-direction: column; gap: 16px;
+    }
+    aside h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+    .dial-row { display: flex; gap: 14px; align-items: center; }
+    #dial { width: 140px; height: 140px; flex: none; cursor: grab; touch-action: none; }
+    #dial:active { cursor: grabbing; }
+    .dial-side { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    #clock { font-family: "JetBrains Mono", monospace; font-size: 30px; font-weight: 600; }
+    #phase { color: var(--muted); font-size: 14px; }
+    input[type=range] { width: 100%; accent-color: var(--accent); }
+    .buttons { display: flex; gap: 8px; }
+    button {
+      flex: 1; font: inherit; font-weight: 600; color: var(--ink);
+      background: #23285a; border: 1px solid #3a4185; border-radius: 10px;
+      padding: 9px 10px; cursor: pointer; transition: background .2s, transform .1s;
+    }
+    button:hover { background: #2e3575; }
+    button:active { transform: translateY(1px); }
+    #census { width: 100%; height: auto; display: block; }
+    .row .lab { fill: var(--muted); font: 13px "JetBrains Mono", monospace; }
+    .row .num { fill: var(--ink); font: 12px "JetBrains Mono", monospace; }
+    .row { cursor: pointer; transition: opacity .2s; }
+    .row.active .lab { fill: #fff; font-weight: 600; }
+    .row.muted { opacity: .35; }
+    .row.peek .bar { stroke: #fff; stroke-width: 2px; }
+    .hint { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .seed { font-family: "JetBrains Mono", monospace; color: var(--muted); font-size: 12px; }
+
+    /* scene animation and linked highlighting */
+    #scene * { transition: opacity .25s; }
+    #scene .dim { opacity: .08 !important; }
+    #scene .hot { stroke: #fff; stroke-width: 1.2px; }
+    .twinkle { animation: twinkle 2.4s ease-in-out infinite alternate; }
+    @keyframes twinkle { from { opacity: 1; } to { opacity: .15; } }
+    .beacon { animation: blink 1.6s steps(2, start) infinite; }
+    @keyframes blink { 50% { opacity: .15; } }
+    .wave { stroke-dasharray: 28 46; animation: flow 6s linear infinite; }
+    @keyframes flow { to { stroke-dashoffset: -148; } }
+    @media (prefers-reduced-motion: reduce) {
+      .twinkle, .beacon, .wave { animation: none; }
+    }
+
+    #tooltip {
+      position: fixed; pointer-events: none; z-index: 10;
+      background: rgba(10, 12, 32, .94); border: 1px solid #3a4185; border-radius: 10px;
+      padding: 8px 11px; font-size: 13px; line-height: 1.5; opacity: 0; transition: opacity .15s;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    }
+    #tooltip code { font-family: "JetBrains Mono", monospace; color: var(--accent); }
+    .sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; border: 1px solid rgba(255,255,255,.4); }
+
+    @media (max-width: 900px) {
+      header { padding: 20px 16px 4px; }
+      main { grid-template-columns: 1fr; padding: 12px 16px 32px; }
+    }
+  </style>
 </head>
 <body>
-  <div id="container"></div>
-  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-  <script>
-    console.log("d3 version", d3.version); // test that d3 loaded
-    // Add an SVG
-    // Add Rectangles
-    // Add Circles
-    // Add Lines
-    // Add Polygons
-  </script>
+  <header>
+    <h1>Night <span>Shift</span></h1>
+    <p>A procedurally generated harbor city drawn entirely with SVG primitives and d3. Drag the clock to move through the day, hover any shape to inspect it, and hover the census bars to find every shape of that kind.</p>
+  </header>
+
+  <main>
+    <svg id="scene" role="img" aria-label="Generated city skyline over a harbor"></svg>
+
+    <aside>
+      <h2>Time of day</h2>
+      <div class="dial-row">
+        <svg id="dial" aria-label="Draggable 24 hour clock"></svg>
+        <div class="dial-side">
+          <div id="clock">21:00</div>
+          <div id="phase">night</div>
+          <input type="range" id="time" min="0" max="24" step="0.05" value="21" aria-label="Hour of day">
+        </div>
+      </div>
+      <div class="buttons">
+        <button id="play">▶ Play</button>
+        <button id="regen">New city</button>
+      </div>
+      <div class="seed" id="seedLabel"></div>
+
+      <h2>Primitive census <span style="text-transform:none;letter-spacing:0">(log scale)</span></h2>
+      <svg id="census"></svg>
+      <p class="hint">Hover or tap a bar to light up every element of that type in the city. Hover a shape in the city and its bar lights up here.</p>
+    </aside>
+  </main>
+
+  <div id="tooltip"></div>
+
+<script>
+// Scene constants
+const W = 960, H = 540, GROUND = 420, SHORE = GROUND + 10;
+const KINDS = ["rect", "circle", "line", "polygon", "path", "ellipse"];
+const kindColor = d3.scaleOrdinal(KINDS, ["#ff8a5c", "#ffd166", "#7bdff2", "#b388ff", "#06d6a0", "#f78fb3"]);
+
+// Seed comes from the URL so a city can be shared
+let seed = +(new URLSearchParams(location.hash.slice(1)).get("seed")) || 2302;
+let hour = 21;
+
+// Time of day model: every color in the scene is driven by these scales
+const HOURS = [0, 5, 6.5, 12, 17.5, 19.5, 24];
+const skyTopScale = d3.scaleLinear().domain(HOURS)
+  .range(["#04061a", "#141a45", "#f39c6b", "#3d9be0", "#4a8fd6", "#2b1d5e", "#04061a"])
+  .interpolate(d3.interpolateRgb);
+const skyBotScale = d3.scaleLinear().domain(HOURS)
+  .range(["#151b3f", "#43306a", "#ffd6a0", "#cfefff", "#ffc27d", "#ff7b6b", "#151b3f"])
+  .interpolate(d3.interpolateRgb);
+const darkness = d3.scaleLinear().domain([0, 5, 7, 17.5, 20, 24]).range([1, 1, 0, 0, 1, 1]).clamp(true);
+const mix = (day, night, k) => d3.interpolateRgb(day, night)(k);
+
+// Main scene
+const scene = d3.select("#scene").attr("viewBox", `0 0 ${W} ${H}`);
+const defs = scene.append("defs");
+
+const skyGrad = defs.append("linearGradient").attr("id", "skyGrad")
+  .attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", 1);
+const skyTop = skyGrad.append("stop").attr("offset", "0%");
+const skyBot = skyGrad.append("stop").attr("offset", "75%");
+
+const glow = defs.append("filter").attr("id", "glow")
+  .attr("x", "-100%").attr("y", "-100%").attr("width", "300%").attr("height", "300%");
+glow.append("feGaussianBlur").attr("stdDeviation", 6).attr("result", "blur");
+const merge = glow.append("feMerge");
+merge.append("feMergeNode").attr("in", "blur");
+merge.append("feMergeNode").attr("in", "SourceGraphic");
+
+const layers = {};
+["sky", "stars", "celestial", "clouds", "mountains", "buildings", "ground", "water"]
+  .forEach(name => layers[name] = scene.append("g").attr("class", `layer-${name}`));
+
+layers.sky.append("rect").attr("class", "bg")
+  .attr("width", W).attr("height", H).attr("fill", "url(#skyGrad)");
+
+// Sun and moon (static, moved by update)
+const sun = layers.celestial.append("g");
+sun.append("circle").attr("r", 34).attr("fill", "#ffd36b").attr("filter", "url(#glow)").attr("data-role", "sun");
+
+const moon = layers.celestial.append("g");
+moon.append("circle").attr("r", 22).attr("fill", "#f3f0e0").attr("filter", "url(#glow)").attr("data-role", "moon");
+[[-7, -5, 4], [6, 4, 5], [-2, 9, 3], [8, -9, 2.5]].forEach(([x, y, r]) =>
+  moon.append("circle").attr("cx", x).attr("cy", y).attr("r", r).attr("fill", "#d8d3bd").attr("data-role", "moon crater"));
+
+// Ground and water (static)
+const promenade = layers.ground.append("rect")
+  .attr("x", 0).attr("y", GROUND).attr("width", W).attr("height", SHORE - GROUND).attr("data-role", "promenade");
+const lampLayer = layers.ground.append("g");
+const treeLayer = layers.ground.append("g");
+
+const water = layers.water.append("rect")
+  .attr("x", 0).attr("y", SHORE).attr("width", W).attr("height", H - SHORE).attr("data-role", "harbor water");
+const reflection = layers.water.append("ellipse")
+  .attr("cy", SHORE + 28).attr("rx", 60).attr("ry", 6).attr("data-role", "light reflection");
+const waveLayer = layers.water.append("g");
+
+// Procedural city
+function build() {
+  const rand = d3.randomLcg((seed * 0.6180339887) % 1);
+  const R = (a, b) => a + rand() * (b - a);
+  d3.select("#seedLabel").text(`seed ${seed} · link to this city: #seed=${seed}`);
+
+  // Stars
+  const stars = d3.range(170).map(() => ({ x: R(0, W), y: R(0, GROUND - 130), r: R(0.4, 1.8), a: R(0.35, 1), delay: R(0, 3) }));
+  layers.stars.selectAll("circle").data(stars).join("circle")
+    .attr("cx", d => d.x).attr("cy", d => d.y).attr("r", d => d.r)
+    .attr("fill", "#ffffff").attr("data-role", "star")
+    .classed("twinkle", (d, i) => i % 3 === 0)
+    .style("animation-delay", d => `${-d.delay}s`);
+
+  // Clouds made of ellipses
+  layers.clouds.selectAll("*").remove();
+  d3.range(5).forEach(() => {
+    const c = { x0: R(0, W + 360), y: R(40, 200), v: R(0.006, 0.018) };
+    const g = layers.clouds.append("g").attr("class", "cloud").datum(c);
+    const n = Math.round(R(3, 6));
+    for (let i = 0; i < n; i++) {
+      g.append("ellipse")
+        .attr("cx", i * R(18, 26)).attr("cy", R(-6, 6))
+        .attr("rx", R(22, 40)).attr("ry", R(11, 18))
+        .attr("data-role", "cloud puff");
+    }
+  });
+
+  // Mountain ridges as polygons
+  const ridge = (n, base, amp) => {
+    const pts = [[0, GROUND]];
+    for (let i = 0; i <= n; i++) pts.push([i * W / n + R(-20, 20), GROUND - base - R(0, amp)]);
+    pts.push([W, GROUND]);
+    return pts;
+  };
+  const ridges = [
+    { pts: ridge(7, 130, 110), day: "#8aa6cc", night: "#1b2350" },
+    { pts: ridge(12, 70, 70), day: "#6687b3", night: "#232c60" }
+  ];
+  layers.mountains.selectAll("polygon").data(ridges).join("polygon")
+    .attr("points", d => d.pts.map(p => p.join(",")).join(" "))
+    .attr("data-role", "mountain ridge");
+
+  // Buildings
+  const palette = d3.interpolateRgbBasis(["#ff9f80", "#f9c86b", "#86d4c7", "#7aa7e0", "#b39ddb", "#f78fb3"]);
+  const bldgs = [];
+  let x = R(-12, 6);
+  while (x < W) {
+    const w = R(38, 92), h = R(90, 290);
+    const r = rand();
+    bldgs.push({ x, w, h, day: palette(rand()), roof: r < 0.25 ? "spire" : r < 0.55 ? "antenna" : "flat" });
+    x += w + R(3, 14);
+  }
+  bldgs.forEach(b => {
+    b.night = mix(b.day, "#0b0f26", 0.8);
+    b.windows = [];
+    const cols = Math.floor((b.w - 8) / 13), rows = Math.floor((b.h - 16) / 18);
+    const ox = (b.w - (cols * 13 - 5)) / 2;
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        b.windows.push({ x: b.x + ox + c * 13, y: GROUND - b.h + 10 + r * 18, th: R(0.05, 1.05) });
+  });
+
+  layers.buildings.selectAll("*").interrupt().remove();
+  bldgs.forEach((b, i) => {
+    const g = layers.buildings.append("g").attr("class", "bldg").datum(b);
+    const top = GROUND - b.h;
+    g.append("rect").attr("class", "body")
+      .attr("x", b.x).attr("y", top).attr("width", b.w).attr("height", b.h)
+      .attr("data-role", "building");
+    if (b.roof === "spire") {
+      g.append("polygon").attr("class", "roof")
+        .attr("points", `${b.x},${top} ${b.x + b.w / 2},${top - R(25, 65)} ${b.x + b.w},${top}`)
+        .attr("data-role", "spire roof");
+    } else if (b.roof === "antenna") {
+      const ax = b.x + b.w * R(0.3, 0.7), at = top - R(22, 55);
+      g.append("line").attr("class", "antenna")
+        .attr("x1", ax).attr("x2", ax).attr("y1", top).attr("y2", at)
+        .attr("stroke-width", 2).attr("data-role", "antenna");
+      g.append("circle").attr("class", "beacon")
+        .attr("cx", ax).attr("cy", at).attr("r", 3).attr("fill", "#ff3b3b")
+        .attr("data-role", "antenna beacon")
+        .style("animation-delay", `${-R(0, 2)}s`);
+    }
+    g.selectAll("rect.win").data(b.windows).join("rect").attr("class", "win")
+      .attr("x", d => d.x).attr("y", d => d.y).attr("width", 8).attr("height", 10).attr("rx", 1)
+      .attr("data-role", "window");
+
+    // Buildings rise out of the ground one after another
+    g.attr("transform", `translate(0,${GROUND}) scale(1,0.001) translate(0,${-GROUND})`)
+      .transition().delay(i * 40).duration(800).ease(d3.easeCubicOut)
+      .attr("transform", `translate(0,${GROUND}) scale(1,1) translate(0,${-GROUND})`);
+  });
+
+  // Street lamps: line posts with circle lights
+  lampLayer.selectAll("*").remove();
+  for (let lx = R(20, 60); lx < W; lx += R(70, 110)) {
+    lampLayer.append("line").attr("class", "post")
+      .attr("x1", lx).attr("x2", lx).attr("y1", GROUND).attr("y2", GROUND - 26)
+      .attr("stroke", "#4b4f73").attr("stroke-width", 2).attr("data-role", "lamp post");
+    lampLayer.append("circle").attr("class", "lamp")
+      .attr("cx", lx).attr("cy", GROUND - 28).attr("r", 4)
+      .attr("filter", "url(#glow)").attr("data-role", "lamp light");
+  }
+
+  // Trees: d3.symbol triangles plus line trunks
+  treeLayer.selectAll("*").remove();
+  const tri = d3.symbol().type(d3.symbolTriangle);
+  for (let tx = R(10, 40); tx < W; tx += R(45, 120)) {
+    const s = R(140, 360);
+    treeLayer.append("line").attr("class", "trunk")
+      .attr("x1", tx).attr("x2", tx).attr("y1", GROUND).attr("y2", GROUND - 8)
+      .attr("stroke", "#5a4030").attr("stroke-width", 3).attr("data-role", "tree trunk");
+    treeLayer.append("path").attr("class", "tree")
+      .attr("d", tri.size(s)()).attr("transform", `translate(${tx},${GROUND - 8 - Math.sqrt(s) / 2.2})`)
+      .attr("data-role", "tree (d3.symbol)");
+  }
+
+  // Water waves: smooth paths from d3.line with a basis curve
+  const line = d3.line().curve(d3.curveBasis);
+  const waves = d3.range(9).map(i => {
+    const y = SHORE + 14 + i * 12 + R(-3, 3), amp = R(1.5, 4), ph = R(0, Math.PI * 2);
+    return d3.range(0, W + 41, 40).map(px => [px, y + Math.sin(px / 55 + ph) * amp]);
+  });
+  waveLayer.selectAll("path").data(waves).join("path").attr("class", "wave")
+    .attr("d", line).attr("fill", "none").attr("stroke", "#ffffff").attr("stroke-width", 1.5)
+    .attr("stroke-linecap", "round").attr("data-role", "wave (d3.line)")
+    .style("animation-duration", () => `${R(4, 9)}s`);
+}
+
+// Where the sun or moon sits for a given hour
+function bodyPos(h) {
+  const a = (h - 6) / 14 * Math.PI;
+  return { x: W / 2 - Math.cos(a) * 400, y: GROUND - 20 - Math.sin(a) * 320, elev: Math.sin(a) };
+}
+
+function phaseName(t) {
+  if (t < 5 || t >= 21) return "night";
+  if (t < 7) return "dawn";
+  if (t < 11) return "morning";
+  if (t < 15) return "midday";
+  if (t < 18) return "afternoon";
+  return "dusk";
+}
+
+// Recolor every element for the current hour
+function update(t) {
+  hour = t;
+  const dk = darkness(t);
+
+  skyTop.attr("stop-color", skyTopScale(t));
+  skyBot.attr("stop-color", skyBotScale(t));
+  layers.stars.selectAll("circle").attr("fill-opacity", d => d.a * dk);
+
+  const s = bodyPos(t), m = bodyPos((t + 12) % 24);
+  sun.attr("transform", `translate(${s.x},${s.y})`);
+  moon.attr("transform", `translate(${m.x},${m.y})`);
+  const up = s.elev > m.elev ? s : m;
+  reflection.attr("cx", up.x)
+    .attr("fill", up === s ? "#ffd36b" : "#f3f0e0")
+    .attr("fill-opacity", Math.max(0, up.elev) * 0.55);
+
+  layers.clouds.selectAll("ellipse").attr("fill", mix("#ffffff", "#3b4170", dk)).attr("fill-opacity", 0.85);
+  layers.mountains.selectAll("polygon").attr("fill", d => mix(d.day, d.night, dk));
+
+  layers.buildings.selectAll("g.bldg").each(function (b) {
+    const g = d3.select(this);
+    g.selectAll(".body, .roof").attr("fill", mix(b.day, b.night, dk));
+    g.selectAll(".antenna").attr("stroke", mix("#5b6280", "#8a93b8", dk));
+  });
+  const unlit = mix("#d8edff", "#151a38", dk);
+  layers.buildings.selectAll("rect.win").attr("fill", d => dk > d.th ? "#ffd772" : unlit);
+
+  promenade.attr("fill", mix("#cdb99a", "#2a2b48", dk));
+  lampLayer.selectAll("circle").attr("fill", "#ffe39a").attr("fill-opacity", 0.15 + dk * 0.85);
+  treeLayer.selectAll("path").attr("fill", mix("#3f9b6b", "#163832", dk));
+  water.attr("fill", mix("#5fa8d3", "#0b1530", dk));
+  waveLayer.selectAll("path").attr("stroke-opacity", 0.18 + dk * 0.12);
+
+  // Panel
+  const hh = Math.floor(t) % 24, mm = Math.floor((t % 1) * 60);
+  d3.select("#clock").text(`${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`);
+  d3.select("#phase").text(phaseName(t));
+  d3.select("#time").property("value", t);
+  hand.attr("transform", `rotate(${t / 24 * 360})`);
+  dial.selectAll("path.seg").attr("opacity", d => d.h === hh ? 1 : 0.5);
+}
+
+// Linked view 1: draggable 24 hour dial built from d3.arc
+const dial = d3.select("#dial").attr("viewBox", "-70 -70 140 140");
+const dialRoot = dial.append("g");
+dialRoot.append("circle").attr("r", 68).attr("fill", "transparent");
+const arc = d3.arc().innerRadius(44).outerRadius(64).padAngle(0.025).cornerRadius(2);
+const hourSegs = d3.range(24).map(h => ({ h, startAngle: h / 24 * 2 * Math.PI, endAngle: (h + 1) / 24 * 2 * Math.PI }));
+dialRoot.selectAll("path.seg").data(hourSegs).join("path").attr("class", "seg")
+  .attr("d", arc).attr("fill", d => d3.interpolateRgb(skyTopScale(d.h + 0.5), skyBotScale(d.h + 0.5))(0.5));
+dialRoot.append("circle").attr("r", 40).attr("fill", "#0f1230");
+[["0", 0, -30], ["6", 30, 0], ["12", 0, 30], ["18", -30, 0]].forEach(([lab, x, y]) =>
+  dialRoot.append("text").text(lab).attr("x", x).attr("y", y).attr("text-anchor", "middle").attr("dy", "0.35em")
+    .attr("fill", "#9aa3c7").attr("font-size", 9).attr("font-family", "JetBrains Mono, monospace"));
+const hand = dialRoot.append("g");
+hand.append("line").attr("y1", 0).attr("y2", -58).attr("stroke", "#ffd772").attr("stroke-width", 3).attr("stroke-linecap", "round");
+hand.append("circle").attr("cy", -58).attr("r", 5).attr("fill", "#ffd772");
+dialRoot.append("circle").attr("r", 4).attr("fill", "#ffd772");
+
+dialRoot.call(d3.drag().on("start drag", event => {
+  let h = Math.atan2(event.x, -event.y) / (2 * Math.PI) * 24;
+  if (h < 0) h += 24;
+  stopPlay();
+  update(h);
+}));
+
+d3.select("#time").on("input", function () { stopPlay(); update(+this.value); });
+
+// Play button animates the full day
+let player = null;
+function stopPlay() {
+  if (player) { player.stop(); player = null; d3.select("#play").text("▶ Play"); }
+}
+d3.select("#play").on("click", () => {
+  if (player) return stopPlay();
+  d3.select("#play").text("❚❚ Pause");
+  player = d3.interval(() => update((hour + 0.04) % 24), 30);
+});
+
+d3.select("#regen").on("click", () => {
+  seed = Math.floor(Math.random() * 1e6);
+  history.replaceState(null, "", `#seed=${seed}`);
+  build(); update(hour); updateCensus();
+});
+
+// Clouds drift forever
+d3.timer(elapsed => {
+  layers.clouds.selectAll("g.cloud")
+    .attr("transform", d => `translate(${((d.x0 + elapsed * d.v) % (W + 360)) - 180},${d.y})`);
+});
+
+// Linked view 2: primitive census bar chart
+const cW = 300, rowH = 30, cH = KINDS.length * rowH + 6;
+const census = d3.select("#census").attr("viewBox", `0 0 ${cW} ${cH}`);
+const cx = d3.scaleLog().range([4, cW - 130]).clamp(true);
+
+function primitives(tag) {
+  return scene.selectAll(tag).filter(function () {
+    return !this.closest("defs") && !this.classList.contains("bg");
+  });
+}
+
+function updateCensus() {
+  const counts = KINDS.map(k => ({ k, n: Math.max(1, primitives(k).size()) }));
+  cx.domain([1, d3.max(counts, d => d.n)]);
+
+  const rows = census.selectAll("g.row").data(counts, d => d.k).join(enter => {
+    const g = enter.append("g").attr("class", "row")
+      .attr("transform", (d, i) => `translate(0,${i * rowH + 3})`);
+    g.append("text").attr("class", "lab").attr("y", rowH / 2).attr("dy", "0.35em").text(d => `<${d.k}>`);
+    g.append("rect").attr("class", "bar").attr("x", 78).attr("y", 5).attr("height", rowH - 10).attr("rx", 5)
+      .attr("width", 0).attr("fill", d => kindColor(d.k));
+    g.append("text").attr("class", "num").attr("x", 84).attr("y", rowH / 2).attr("dy", "0.35em").text("0");
+    g.append("rect").attr("class", "hit").attr("width", cW).attr("height", rowH).attr("fill", "transparent");
+    return g;
+  });
+
+  rows.select(".bar").transition().duration(700).attr("width", d => cx(d.n));
+  rows.select(".num").transition().duration(700)
+    .attr("x", d => 78 + cx(d.n) + 6)
+    .tween("text", function (d) {
+      const i = d3.interpolateRound(+this.textContent || 0, d.n);
+      return t => this.textContent = i(t);
+    });
+
+  rows.on("mouseenter", (e, d) => highlightKind(d.k))
+      .on("mouseleave", () => highlightKind(null))
+      .on("click", (e, d) => highlightKind(lockedKind === d.k ? null : d.k, true));
+}
+
+let lockedKind = null;
+function highlightKind(k, lock = false) {
+  if (lock) lockedKind = k;
+  else if (lockedKind && !k) k = lockedKind;
+  census.selectAll("g.row").classed("active", d => d.k === k).classed("muted", d => k && d.k !== k);
+  scene.selectAll(KINDS.join(","))
+    .classed("dim", function () { return !!k && this.tagName !== k && !this.classList.contains("bg"); })
+    .classed("hot", function () { return !!k && this.tagName === k; });
+}
+
+// Tooltips on any shape in the scene, linked back to the census
+const tip = d3.select("#tooltip");
+scene.on("mousemove", event => {
+  const el = event.target, tag = el.tagName;
+  if (!KINDS.includes(tag) || el.classList.contains("bg")) {
+    tip.style("opacity", 0);
+    census.selectAll("g.row").classed("peek", false);
+    return;
+  }
+  const paint = tag === "line" || el.getAttribute("fill") === "none" ? el.getAttribute("stroke") : el.getAttribute("fill");
+  const c = d3.color(paint);
+  const hex = c ? c.formatHex() : paint;
+  tip.html(`<code>&lt;${tag}&gt;</code> ${el.getAttribute("data-role") || ""}<br><span class="sw" style="background:${hex}"></span>${hex}`)
+    .style("opacity", 1)
+    .style("left", `${Math.min(event.clientX + 14, window.innerWidth - 200)}px`)
+    .style("top", `${event.clientY + 14}px`);
+  census.selectAll("g.row").classed("peek", d => d.k === tag);
+});
+scene.on("mouseleave", () => {
+  tip.style("opacity", 0);
+  census.selectAll("g.row").classed("peek", false);
+});
+
+// Go
+build();
+update(hour);
+updateCensus();
+</script>
 </body>
 </html>
